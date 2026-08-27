@@ -1,10 +1,11 @@
+generator client {
+  provider        = "prisma-client-js"
+  previewFeatures = ["driverAdapters"]
+}
+
 datasource db {
   provider = "sqlite"
   url      = env("DATABASE_URL")
-}
-
-generator client {
-  provider = "prisma-client-js"
 }
 
 model Admin {
@@ -18,8 +19,8 @@ model Admin {
 }
 
 model Appointment {
-  id                 String     @id @default(uuid())
-  appointmentId      String     @unique
+  id                 String       @id @default(uuid())
+  appointmentId      String       @unique
   fullName           String
   email              String
   position           String
@@ -28,14 +29,14 @@ model Appointment {
   appointmentDate    String
   joiningDate        String?
   duration           String?
-  status             String     @default("Verified") // Verified, Pending, Revoked
+  status             String       @default("Verified") // Verified, Pending, Revoked
   phone              String?
   college            String?
   registrationNumber String?
   documentUrl        String?
   documentFilename   String?
-  createdAt          DateTime   @default(now())
-  updatedAt          DateTime   @updatedAt
+  createdAt          DateTime     @default(now())
+  updatedAt          DateTime     @updatedAt
   documents          Document[]
 }
 
