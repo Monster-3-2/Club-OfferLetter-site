@@ -23,7 +23,11 @@ const prisma = new PrismaClient();
 
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'stats_o_locked_jwt_super_secret_key_2026';
-const UPLOADS_DIR = path.resolve(__dirname, '../../uploads');
+
+// FIX FOR VERCEL: Use ephemeral /tmp directory in production, local folder otherwise
+const UPLOADS_DIR = process.env.NODE_ENV === 'production'
+  ? '/tmp/uploads'
+  : path.resolve(__dirname, '../../uploads');
 
 if (!fs.existsSync(UPLOADS_DIR)) {
   fs.mkdirSync(UPLOADS_DIR, { recursive: true });
@@ -504,7 +508,7 @@ app.post('/api/admin/import/csv-parse', authenticateAdmin, upload.single('csvFil
 // Confirm & Execute Bulk CSV Import
 app.post('/api/admin/import/confirm', authenticateAdmin, async (req, res) => {
   try {
-    const { rows, duplicateStrategy = 'update' } = req.body; // update, skip, create
+    const { rows, duplicateStrategy = 'update' } = req.body;
 
     if (!Array.isArray(rows) || !rows.length) {
       return res.status(400).json({ ok: false, error: 'No valid rows provided for import.' });
@@ -632,10 +636,7 @@ app.get('*', (req, res) => {
   }
 });
 
-
-// At the bottom of src/index.js
-
-// Keep your listen block for local testing
+// Keep listen block for local testing only
 if (process.env.NODE_ENV !== 'production') {
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
