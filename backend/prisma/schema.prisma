@@ -1,0 +1,63 @@
+datasource db {
+  provider = "sqlite"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+model Admin {
+  id           String   @id @default(uuid())
+  name         String
+  email        String   @unique
+  passwordHash String
+  role         String   @default("ADMIN")
+  createdAt    DateTime @default(now())
+  updatedAt    DateTime @updatedAt
+}
+
+model Appointment {
+  id                 String     @id @default(uuid())
+  appointmentId      String     @unique
+  fullName           String
+  email              String
+  position           String
+  department         String
+  team               String?
+  appointmentDate    String
+  joiningDate        String?
+  duration           String?
+  status             String     @default("Verified") // Verified, Pending, Revoked
+  phone              String?
+  college            String?
+  registrationNumber String?
+  documentUrl        String?
+  documentFilename   String?
+  createdAt          DateTime   @default(now())
+  updatedAt          DateTime   @updatedAt
+  documents          Document[]
+}
+
+model Document {
+  id            String      @id @default(uuid())
+  appointmentId String
+  appointment   Appointment @relation(fields: [appointmentId], references: [id], onDelete: Cascade)
+  filename      String
+  storageKey    String
+  mimeType      String
+  fileSize      Int
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+}
+
+model AuditLog {
+  id         String   @id @default(uuid())
+  adminId    String
+  adminEmail String?
+  action     String
+  entityType String
+  entityId   String?
+  metadata   String?
+  createdAt  DateTime @default(now())
+}
