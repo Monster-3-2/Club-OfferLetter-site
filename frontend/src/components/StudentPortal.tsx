@@ -15,13 +15,15 @@ import {
   Calendar, 
   Loader2, 
   Check, 
-  Copy, 
-  RefreshCw,
-  Award
+  Copy
 } from 'lucide-react';
 import { PDFViewerModal } from './PDFViewerModal';
 
-const API_BASE = (import.meta.env.VITE_API_URL || 'https://backend-six-sand-58.vercel.app').replace(/\/$/, '');
+const API_BASE = ((import.meta as any).env?.VITE_API_URL || 'https://backend-six-sand-58.vercel.app').replace(/\/$/, '');
+
+interface StudentPortalProps {
+  onOpenAdmin?: () => void;
+}
 
 interface AppointmentData {
   id: string;
@@ -37,7 +39,7 @@ interface AppointmentData {
   status: string;
 }
 
-export function StudentPortal() {
+export function StudentPortal({ onOpenAdmin }: StudentPortalProps) {
   const [email, setEmail] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -48,7 +50,6 @@ export function StudentPortal() {
 
   const canvasRef = useRef<HTMLCanvasElement | null>(null);
 
-  // Background glow particle effect
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas) return;
@@ -176,14 +177,12 @@ export function StudentPortal() {
 
   return (
     <div className="relative w-full max-w-2xl mx-auto px-4 py-8">
-      {/* Verification Card */}
       <div className="relative z-10 bg-[#070b14]/80 backdrop-blur-xl border border-white/10 rounded-3xl p-6 sm:p-10 shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden transition-all duration-300 hover:border-[#00F0FF]/30">
         <canvas
           ref={canvasRef}
           className="absolute inset-0 pointer-events-none w-full h-full opacity-40"
         />
 
-        {/* Top Header Badge */}
         <div className="relative z-10 flex flex-col items-center text-center mb-8">
           <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#00F0FF]/10 border border-[#00F0FF]/30 text-[#00F0FF] text-xs font-mono tracking-wider mb-4 shadow-[0_0_15px_rgba(0,240,255,0.2)]">
             <ShieldCheck className="w-4 h-4 text-[#00F0FF]" />
@@ -197,7 +196,6 @@ export function StudentPortal() {
           </p>
         </div>
 
-        {/* Input Form */}
         <form onSubmit={handleVerify} className="relative z-10 space-y-4">
           <div>
             <label className="block text-xs font-mono tracking-wider text-gray-300 uppercase mb-2">
@@ -234,7 +232,6 @@ export function StudentPortal() {
           </button>
         </form>
 
-        {/* Error Notification */}
         {error && (
           <div className="relative z-10 mt-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-start gap-3 text-red-400 text-sm animate-in fade-in slide-in-from-top-2 duration-300">
             <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-400" />
@@ -242,10 +239,8 @@ export function StudentPortal() {
           </div>
         )}
 
-        {/* Result & Appointment Record Card */}
         {appointment && (
           <div className="relative z-10 mt-8 pt-8 border-t border-white/10 space-y-6 animate-in fade-in zoom-in-95 duration-500">
-            {/* Status header banner */}
             <div className="flex items-center justify-between p-4 rounded-2xl bg-[#00F0FF]/5 border border-[#00F0FF]/20">
               <div className="flex items-center gap-3">
                 <div className="w-9 h-9 rounded-xl bg-[#00F0FF]/20 flex items-center justify-center text-[#00F0FF]">
@@ -264,7 +259,6 @@ export function StudentPortal() {
               </div>
             </div>
 
-            {/* Structured Info Grid */}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-sm">
               <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center gap-3">
                 <User className="w-4 h-4 text-[#00F0FF]" />
@@ -315,7 +309,6 @@ export function StudentPortal() {
               </div>
             </div>
 
-            {/* Cryptographic Hash Section */}
             {appointment.verificationHash && (
               <div className="p-4 rounded-2xl bg-black/40 border border-white/5">
                 <div className="flex items-center justify-between mb-1.5">
@@ -344,7 +337,6 @@ export function StudentPortal() {
               </div>
             )}
 
-            {/* Action Buttons */}
             <div className="flex flex-col sm:flex-row gap-3 pt-2">
               <button
                 type="button"
@@ -378,9 +370,10 @@ export function StudentPortal() {
         )}
       </div>
 
-      {/* PDF Modal */}
       {showPreviewModal && appointment && (
         <PDFViewerModal
+          pdfUrl={`${API_BASE}/api/appointments/download/${encodeURIComponent(appointment.regNo)}`}
+          title={`Appointment Letter - ${appointment.name}`}
           regNo={appointment.regNo}
           name={appointment.name}
           onClose={() => setShowPreviewModal(false)}
