@@ -632,6 +632,14 @@ app.get('*', (req, res) => {
   }
 });
 
-app.listen(PORT, () => {
-  console.log(`🚀 Stats-O-Locked REST API Server running on port ${PORT}`);
-});
+
+// At the bottom of src/index.js
+
+// Keep your listen block for local testing
+if (process.env.NODE_ENV !== 'production') {
+  const PORT = process.env.PORT || 5000;
+  app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
+}
+
+// CRITICAL FOR VERCEL: Export the Express app instance
+export default app;
