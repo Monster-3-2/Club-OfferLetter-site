@@ -4,6 +4,8 @@ import { X, Download } from 'lucide-react';
 const API_BASE = ((import.meta as any).env?.VITE_API_URL || 'https://backend-six-sand-58.vercel.app').replace(/\/$/, '');
 
 export interface PDFViewerModalProps {
+  documentUrl?: string;
+  candidateName?: string;
   pdfUrl?: string;
   title?: string;
   regNo?: string;
@@ -11,8 +13,21 @@ export interface PDFViewerModalProps {
   onClose: () => void;
 }
 
-export function PDFViewerModal({ pdfUrl, title, regNo, name, onClose }: PDFViewerModalProps) {
-  const resolvedUrl = pdfUrl || (regNo ? `${API_BASE}/api/appointments/download/${encodeURIComponent(regNo)}` : '');
+export function PDFViewerModal({
+  documentUrl,
+  candidateName,
+  pdfUrl,
+  title,
+  regNo,
+  name,
+  onClose
+}: PDFViewerModalProps) {
+  const resolvedUrl =
+    documentUrl ||
+    pdfUrl ||
+    (regNo ? `${API_BASE}/api/appointments/download/${encodeURIComponent(regNo)}` : '');
+
+  const resolvedName = candidateName || name;
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm">
@@ -20,7 +35,11 @@ export function PDFViewerModal({ pdfUrl, title, regNo, name, onClose }: PDFViewe
         <div className="flex items-center justify-between px-6 py-4 border-b border-white/10 bg-white/5">
           <div>
             <h3 className="text-white font-semibold text-sm">{title || 'Appointment Letter Preview'}</h3>
-            {name && <p className="text-gray-400 text-xs">{name} {regNo ? `(${regNo})` : ''}</p>}
+            {resolvedName && (
+              <p className="text-gray-400 text-xs">
+                {resolvedName} {regNo ? `(${regNo})` : ''}
+              </p>
+            )}
           </div>
           <div className="flex items-center gap-2">
             {resolvedUrl && (
