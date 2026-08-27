@@ -8,11 +8,13 @@
     "start": "node src/index.js",
     "dev": "node --watch src/index.js",
     "postinstall": "prisma generate",
-    "build": "prisma db push",
+    "build": "prisma generate",
     "db:push": "prisma db push",
     "db:seed": "node src/seed.js"
   },
   "dependencies": {
+    "@libsql/client": "^0.14.0",
+    "@prisma/adapter-libsql": "^5.22.0",
     "@prisma/client": "^5.22.0",
     "bcryptjs": "^2.4.3",
     "cors": "^2.8.5",
