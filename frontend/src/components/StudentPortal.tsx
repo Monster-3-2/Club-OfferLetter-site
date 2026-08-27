@@ -1,304 +1,391 @@
-import React, { useState } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { Search, Mail, ShieldCheck, FileCheck, Download, Eye, AlertCircle, Sparkles, User, Calendar, Award, Hash, Building2 } from 'lucide-react';
-import confetti from 'canvas-confetti';
+import React, { useState, useEffect, useRef } from 'react';
+import { 
+  ShieldCheck, 
+  Search, 
+  Download, 
+  Eye, 
+  Sparkles, 
+  CheckCircle2, 
+  AlertCircle, 
+  User, 
+  Hash, 
+  Briefcase, 
+  Layers, 
+  Building2, 
+  Calendar, 
+  Loader2, 
+  Check, 
+  Copy, 
+  RefreshCw,
+  Award
+} from 'lucide-react';
 import { PDFViewerModal } from './PDFViewerModal';
 
-interface StudentPortalProps {
-  onOpenAdmin: () => void;
-}
+const API_BASE = (import.meta.env.VITE_API_URL || 'https://backend-six-sand-58.vercel.app').replace(/\/$/, '');
 
-interface AppointmentRecord {
+interface AppointmentData {
   id: string;
-  appointmentId: string;
-  fullName: string;
+  name: string;
+  regNo: string;
   email: string;
-  position: string;
+  role: string;
+  domain: string;
   department: string;
-  team?: string;
-  appointmentDate: string;
-  joiningDate?: string;
-  duration?: string;
+  tenure: string;
+  verificationHash: string;
+  issuedAt: string;
   status: string;
-  hasDocument: boolean;
 }
 
-export const StudentPortal: React.FC<StudentPortalProps> = ({ onOpenAdmin }) => {
-  const [email, setEmail] = useState<string>('');
-  const [loading, setLoading] = useState<boolean>(false);
+export function StudentPortal() {
+  const [email, setEmail] = useState('');
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [appointment, setAppointment] = useState<AppointmentRecord | null>(null);
-  const [showPdfModal, setShowPdfModal] = useState<boolean>(false);
+  const [appointment, setAppointment] = useState<AppointmentData | null>(null);
+  const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [copiedHash, setCopiedHash] = useState(false);
+  const [downloading, setDownloading] = useState(false);
+
+  const canvasRef = useRef<HTMLCanvasElement | null>(null);
+
+  // Background glow particle effect
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    let animationFrameId: number;
+    let width = (canvas.width = canvas.offsetWidth);
+    let height = (canvas.height = canvas.offsetHeight);
+
+    const particles: Array<{
+      x: number;
+      y: number;
+      radius: number;
+      dx: number;
+      dy: number;
+      alpha: number;
+    }> = [];
+
+    for (let i = 0; i < 25; i++) {
+      particles.push({
+        x: Math.random() * width,
+        y: Math.random() * height,
+        radius: Math.random() * 1.5 + 0.5,
+        dx: (Math.random() - 0.5) * 0.4,
+        dy: (Math.random() - 0.5) * 0.4,
+        alpha: Math.random() * 0.5 + 0.2
+      });
+    }
+
+    const render = () => {
+      ctx.clearRect(0, 0, width, height);
+      particles.forEach((p) => {
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.radius, 0, Math.PI * 2);
+        ctx.fillStyle = `rgba(0, 240, 255, ${p.alpha})`;
+        ctx.shadowBlur = 8;
+        ctx.shadowColor = '#00F0FF';
+        ctx.fill();
+
+        p.x += p.dx;
+        p.y += p.dy;
+
+        if (p.x < 0 || p.x > width) p.dx *= -1;
+        if (p.y < 0 || p.y > height) p.dy *= -1;
+      });
+
+      animationFrameId = requestAnimationFrame(render);
+    };
+
+    render();
+
+    const handleResize = () => {
+      if (!canvas) return;
+      width = canvas.width = canvas.offsetWidth;
+      height = canvas.height = canvas.offsetHeight;
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => {
+      cancelAnimationFrame(animationFrameId);
+      window.removeEventListener('resize', handleResize);
+    };
+  }, []);
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
-    const cleanEmail = email.trim().toLowerCase();
-    if (!cleanEmail) return;
+    if (!email.trim()) return;
 
     setLoading(true);
     setError(null);
     setAppointment(null);
 
     try {
-      const res = await fetch('/api/appointments/verify', {
+      const response = await fetch(`${API_BASE}/api/appointments/verify`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email: cleanEmail }),
+        body: JSON.stringify({ email: email.trim().toLowerCase() })
       });
 
-      const data = await res.json();
+      const data = await response.json();
 
-      if (!data.ok) {
-        setError(data.error || 'No appointment record found for this email address.');
-        setLoading(false);
-        return;
+      if (!response.ok) {
+        throw new Error(data.error || 'No appointment letter found for this email address.');
       }
 
       setAppointment(data.appointment);
-      setLoading(false);
-
-      // Trigger Confetti Celebration
-      confetti({
-        particleCount: 80,
-        spread: 70,
-        origin: { y: 0.6 },
-        colors: ['#00F0FF', '#0070F3', '#7928CA', '#10B981'],
-      });
     } catch (err: any) {
-      setError('Server connection error. Please try again.');
+      setError(err.message || 'Server connection error. Please try again.');
+    } finally {
       setLoading(false);
     }
   };
 
-  const getDocUrl = (id: string) => `/api/appointments/${id}/document`;
+  const handleDownload = async () => {
+    if (!appointment) return;
+    setDownloading(true);
+    try {
+      const downloadUrl = `${API_BASE}/api/appointments/download/${encodeURIComponent(appointment.regNo)}`;
+      const response = await fetch(downloadUrl);
+      if (!response.ok) throw new Error('Failed to download PDF.');
+      
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `Appointment_Letter_${appointment.regNo}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+      window.URL.revokeObjectURL(url);
+    } catch (err: any) {
+      setError(err.message || 'Error downloading PDF letter.');
+    } finally {
+      setDownloading(false);
+    }
+  };
+
+  const copyHashToClipboard = () => {
+    if (!appointment?.verificationHash) return;
+    navigator.clipboard.writeText(appointment.verificationHash);
+    setCopiedHash(true);
+    setTimeout(() => setCopiedHash(false), 2000);
+  };
 
   return (
-    <div className="min-h-screen bg-[#050B14] bg-grid-pattern text-white flex flex-col font-sans relative overflow-hidden">
-      
-      {/* Header Bar */}
-      <header className="border-b border-slate-800 bg-[#050B14]/90 backdrop-blur-md sticky top-0 z-30">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
-          {/* Left College Logo */}
-          <div className="flex items-center gap-3">
-            <div className="bg-white/95 px-3 py-1.5 rounded-xl border border-white/20 shadow-md">
-              <img src="/vit_bhopal_logo.png" alt="VIT Bhopal Logo" className="h-10 w-auto object-contain" />
-            </div>
-          </div>
+    <div className="relative w-full max-w-2xl mx-auto px-4 py-8">
+      {/* Verification Card */}
+      <div className="relative z-10 bg-[#070b14]/80 backdrop-blur-xl border border-white/10 rounded-3xl p-6 sm:p-10 shadow-[0_0_50px_rgba(0,0,0,0.8)] overflow-hidden transition-all duration-300 hover:border-[#00F0FF]/30">
+        <canvas
+          ref={canvasRef}
+          className="absolute inset-0 pointer-events-none w-full h-full opacity-40"
+        />
 
-          {/* Center Title */}
-          <div className="text-center hidden sm:block">
-            <div className="flex items-center justify-center gap-1.5 text-[11px] font-mono font-extrabold text-[#00F0FF] tracking-widest uppercase mb-0.5">
-              <ShieldCheck className="w-3.5 h-3.5" /> OFFICIAL APPOINTMENT PORTAL
-            </div>
-            <h1 className="font-heading font-black text-xl tracking-wider text-white">
-              STATS-O-LOCKED
-            </h1>
-            <p className="text-[11px] font-mono text-slate-400 tracking-widest">
-              VIT BHOPAL &bull; AI & DATA CLUB
-            </p>
+        {/* Top Header Badge */}
+        <div className="relative z-10 flex flex-col items-center text-center mb-8">
+          <div className="inline-flex items-center gap-2 px-3.5 py-1.5 rounded-full bg-[#00F0FF]/10 border border-[#00F0FF]/30 text-[#00F0FF] text-xs font-mono tracking-wider mb-4 shadow-[0_0_15px_rgba(0,240,255,0.2)]">
+            <ShieldCheck className="w-4 h-4 text-[#00F0FF]" />
+            <span>APPOINTMENT ACCESS</span>
           </div>
-
-          {/* Right Club Logo & Admin Portal Switch */}
-          <div className="flex items-center gap-3">
-            <div className="w-12 h-12 rounded-full border-2 border-[#00F0FF] bg-white/95 p-1 flex items-center justify-center shadow-[0_0_15px_rgba(0,240,255,0.3)]">
-              <img src="/stats_club_logo.png" alt="Stats Emblem" className="w-10 h-10 object-contain rounded-full" />
-            </div>
-
-            <button
-              onClick={onOpenAdmin}
-              className="hidden md:flex items-center gap-2 px-3.5 py-2 text-xs font-mono font-bold text-slate-300 hover:text-[#00F0FF] bg-slate-900/80 border border-slate-800 hover:border-[#00F0FF]/40 rounded-xl transition"
-            >
-              ADMIN PORTAL
-            </button>
-          </div>
+          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-white mb-2 font-display">
+            Appointment Letter Verification
+          </h1>
+          <p className="text-gray-400 text-sm max-w-md">
+            Enter your registered email ID to retrieve and authenticate your official Stats-O-Locked appointment letter.
+          </p>
         </div>
-      </header>
 
-      {/* Main Content Area */}
-      <main className="flex-1 max-w-4xl w-full mx-auto px-4 py-8 sm:py-12 z-10">
-        
-        {/* Verification Hero Card */}
-        <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-          className="bg-[#091424]/90 border border-slate-800 rounded-3xl p-6 sm:p-10 shadow-2xl relative hud-box overflow-hidden mb-8"
-        >
-          <div className="text-center max-w-2xl mx-auto mb-8">
-            <span className="inline-flex items-center gap-2 px-4 py-1.5 rounded-full bg-[#00F0FF]/10 text-[#00F0FF] border border-[#00F0FF]/20 text-xs font-mono font-bold tracking-wider uppercase mb-3">
-              <Sparkles className="w-3.5 h-3.5" /> APPOINTMENT ACCESS
-            </span>
-            <h2 className="font-heading font-black text-2xl sm:text-4xl text-white tracking-wide mb-2">
-              Appointment Letter Verification
-            </h2>
-            <p className="text-sm sm:text-base text-slate-400">
-              Enter your registered email ID to retrieve your official appointment letter.
-            </p>
+        {/* Input Form */}
+        <form onSubmit={handleVerify} className="relative z-10 space-y-4">
+          <div>
+            <label className="block text-xs font-mono tracking-wider text-gray-300 uppercase mb-2">
+              Registered Email
+            </label>
+            <div className="relative">
+              <input
+                type="email"
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                placeholder="sankil.25bai10311@vitbhopal.ac.in"
+                required
+                className="w-full bg-[#0d1527]/90 border border-white/10 rounded-2xl px-5 py-4 text-white placeholder-gray-500 text-sm sm:text-base focus:outline-none focus:border-[#00F0FF] focus:ring-1 focus:ring-[#00F0FF] transition-all shadow-inner font-sans"
+              />
+            </div>
           </div>
 
-          {/* Form */}
-          <form onSubmit={handleVerify} className="max-w-xl mx-auto space-y-4">
-            <div>
-              <label className="block text-xs font-mono font-bold text-slate-300 uppercase tracking-widest mb-2">
-                REGISTERED EMAIL
-              </label>
-              <div className="relative">
-                <Mail className="absolute left-4 top-1/2 -translate-y-1/2 w-5 h-5 text-[#00F0FF]" />
-                <input
-                  type="email"
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  placeholder="Enter your email address"
-                  required
-                  className="w-full pl-12 pr-4 py-4 bg-[#050B14] border-2 border-slate-800 focus:border-[#00F0FF] rounded-2xl text-white placeholder-slate-500 font-sans text-base outline-none transition duration-200 shadow-inner"
-                />
+          <button
+            type="submit"
+            disabled={loading}
+            className="w-full bg-gradient-to-r from-[#00F0FF] via-[#00B8FF] to-[#0070F3] hover:brightness-110 active:scale-[0.99] text-black font-semibold rounded-2xl py-4 flex items-center justify-center gap-2.5 transition-all disabled:opacity-50 text-sm sm:text-base shadow-[0_0_30px_rgba(0,240,255,0.3)] cursor-pointer"
+          >
+            {loading ? (
+              <>
+                <Loader2 className="w-5 h-5 animate-spin" />
+                <span className="font-mono uppercase tracking-wider">Verifying Record...</span>
+              </>
+            ) : (
+              <>
+                <Search className="w-5 h-5" />
+                <span className="font-mono uppercase tracking-wider">Verify & Retrieve</span>
+              </>
+            )}
+          </button>
+        </form>
+
+        {/* Error Notification */}
+        {error && (
+          <div className="relative z-10 mt-6 p-4 rounded-2xl bg-red-500/10 border border-red-500/30 flex items-start gap-3 text-red-400 text-sm animate-in fade-in slide-in-from-top-2 duration-300">
+            <AlertCircle className="w-5 h-5 flex-shrink-0 mt-0.5 text-red-400" />
+            <div className="flex-1 font-sans">{error}</div>
+          </div>
+        )}
+
+        {/* Result & Appointment Record Card */}
+        {appointment && (
+          <div className="relative z-10 mt-8 pt-8 border-t border-white/10 space-y-6 animate-in fade-in zoom-in-95 duration-500">
+            {/* Status header banner */}
+            <div className="flex items-center justify-between p-4 rounded-2xl bg-[#00F0FF]/5 border border-[#00F0FF]/20">
+              <div className="flex items-center gap-3">
+                <div className="w-9 h-9 rounded-xl bg-[#00F0FF]/20 flex items-center justify-center text-[#00F0FF]">
+                  <CheckCircle2 className="w-5 h-5" />
+                </div>
+                <div>
+                  <h4 className="text-white text-sm font-semibold font-display">Official Record Authenticated</h4>
+                  <p className="text-xs text-gray-400 font-mono">Status: {appointment.status || 'Active'}</p>
+                </div>
+              </div>
+              <div className="text-right">
+                <span className="text-[10px] font-mono text-[#00F0FF] uppercase tracking-wider block">Issue Date</span>
+                <span className="text-xs text-white font-mono">
+                  {appointment.issuedAt ? new Date(appointment.issuedAt).toLocaleDateString() : 'Active Term'}
+                </span>
               </div>
             </div>
 
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full py-4 bg-gradient-to-r from-[#00F0FF] to-[#0070F3] text-black font-heading font-extrabold text-base tracking-wider uppercase rounded-2xl shadow-[0_0_25px_rgba(0,240,255,0.4)] hover:shadow-[0_0_40px_rgba(0,240,255,0.7)] hover:scale-[1.01] active:scale-[0.99] transition duration-200 flex items-center justify-center gap-3 disabled:opacity-50"
-            >
-              {loading ? (
-                <div className="w-6 h-6 border-2 border-black border-t-transparent rounded-full animate-spin" />
-              ) : (
-                <>
-                  <Search className="w-5 h-5" /> VERIFY & RETRIEVE
-                </>
-              )}
-            </button>
-          </form>
-
-          {/* Error Message */}
-          <AnimatePresence>
-            {error && (
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0 }}
-                className="mt-6 max-w-xl mx-auto p-4 bg-rose-500/10 border border-rose-500/30 rounded-2xl flex items-center gap-3 text-rose-300 text-sm"
-              >
-                <AlertCircle className="w-5 h-5 flex-shrink-0 text-rose-400" />
-                <span>{error}</span>
-              </motion.div>
-            )}
-          </AnimatePresence>
-        </motion.div>
-
-        {/* Identity Verified Result Section */}
-        <AnimatePresence>
-          {appointment && (
-            <motion.div
-              initial={{ opacity: 0, y: 30 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.5 }}
-              className="space-y-6"
-            >
-              {/* Status Header Badge */}
-              <div className="bg-[#091424] border border-[#00F0FF]/40 rounded-3xl p-6 sm:p-8 shadow-2xl relative hud-box">
-                <div className="flex flex-wrap items-center justify-between gap-4 pb-6 border-b border-slate-800">
-                  <div className="inline-flex items-center gap-2.5 px-4 py-2 bg-emerald-500/15 border border-emerald-500/30 text-emerald-400 rounded-full font-mono font-bold text-xs uppercase tracking-wider">
-                    <ShieldCheck className="w-4 h-4 text-emerald-400" /> IDENTITY VERIFIED
-                  </div>
-                  <div className="text-xs font-mono text-slate-400">
-                    APPOINTMENT ID: <span className="text-[#00F0FF] font-bold">{appointment.appointmentId}</span>
-                  </div>
-                </div>
-
-                {/* Candidate Grid Information */}
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6 pt-6">
-                  <div className="space-y-1">
-                    <span className="text-xs font-mono text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <User className="w-3.5 h-3.5 text-[#00F0FF]" /> NAME
-                    </span>
-                    <p className="font-heading font-black text-xl text-white">{appointment.fullName}</p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <span className="text-xs font-mono text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Award className="w-3.5 h-3.5 text-[#00F0FF]" /> POSITION
-                    </span>
-                    <p className="font-heading font-bold text-lg text-[#00F0FF]">{appointment.position}</p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <span className="text-xs font-mono text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Building2 className="w-3.5 h-3.5 text-[#00F0FF]" /> DEPARTMENT
-                    </span>
-                    <p className="font-sans font-semibold text-slate-200">{appointment.department || 'Technical'}</p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <span className="text-xs font-mono text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Calendar className="w-3.5 h-3.5 text-[#00F0FF]" /> APPOINTMENT DATE
-                    </span>
-                    <p className="font-sans font-semibold text-slate-200">{appointment.appointmentDate}</p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <span className="text-xs font-mono text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Mail className="w-3.5 h-3.5 text-[#00F0FF]" /> EMAIL
-                    </span>
-                    <p className="font-sans font-semibold text-slate-300 text-sm truncate">{appointment.email}</p>
-                  </div>
-
-                  <div className="space-y-1">
-                    <span className="text-xs font-mono text-slate-400 uppercase tracking-wider flex items-center gap-1.5">
-                      <Hash className="w-3.5 h-3.5 text-[#00F0FF]" /> STATUS
-                    </span>
-                    <span className="inline-block px-3 py-1 bg-emerald-500/20 text-emerald-400 border border-emerald-500/30 rounded-lg text-xs font-mono font-bold">
-                      {appointment.status}
-                    </span>
-                  </div>
-                </div>
-
-                {/* Document Action Section */}
-                <div className="mt-8 pt-6 border-t border-slate-800 flex flex-wrap items-center justify-between gap-4">
-                  <div className="flex items-center gap-2 text-xs font-mono text-slate-400">
-                    <FileCheck className="w-4 h-4 text-[#00F0FF]" />
-                    APPOINTMENT LETTER Status: <span className="text-emerald-400 font-bold">VERIFIED DOCUMENT</span>
-                  </div>
-
-                  <div className="flex items-center gap-3 w-full sm:w-auto">
-                    <button
-                      onClick={() => setShowPdfModal(true)}
-                      className="flex-1 sm:flex-initial px-5 py-3 bg-slate-800 hover:bg-slate-700 text-white font-heading font-bold text-xs tracking-wider uppercase rounded-xl border border-slate-700 transition flex items-center justify-center gap-2"
-                    >
-                      <Eye className="w-4 h-4 text-[#00F0FF]" /> PREVIEW LETTER
-                    </button>
-
-                    <a
-                      href={`${getDocUrl(appointment.id)}?download=true`}
-                      download
-                      className="flex-1 sm:flex-initial px-6 py-3 bg-gradient-to-r from-[#00F0FF] to-[#0070F3] text-black font-heading font-extrabold text-xs tracking-wider uppercase rounded-xl shadow-[0_0_20px_rgba(0,240,255,0.3)] hover:shadow-[0_0_35px_rgba(0,240,255,0.6)] hover:scale-105 transition flex items-center justify-center gap-2"
-                    >
-                      <Download className="w-4 h-4" /> DOWNLOAD APPOINTMENT LETTER
-                    </a>
-                  </div>
+            {/* Structured Info Grid */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3.5 text-sm">
+              <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center gap-3">
+                <User className="w-4 h-4 text-[#00F0FF]" />
+                <div>
+                  <span className="text-gray-400 text-xs block">Full Name</span>
+                  <span className="text-white font-medium">{appointment.name}</span>
                 </div>
               </div>
-            </motion.div>
-          )}
-        </AnimatePresence>
-      </main>
+
+              <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center gap-3">
+                <Hash className="w-4 h-4 text-[#00F0FF]" />
+                <div>
+                  <span className="text-gray-400 text-xs block">Registration No.</span>
+                  <span className="text-white font-mono font-medium">{appointment.regNo}</span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center gap-3">
+                <Briefcase className="w-4 h-4 text-[#00F0FF]" />
+                <div>
+                  <span className="text-gray-400 text-xs block">Assigned Role</span>
+                  <span className="text-[#00F0FF] font-semibold">{appointment.role}</span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center gap-3">
+                <Layers className="w-4 h-4 text-[#00F0FF]" />
+                <div>
+                  <span className="text-gray-400 text-xs block">Domain</span>
+                  <span className="text-white font-medium">{appointment.domain}</span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center gap-3">
+                <Building2 className="w-4 h-4 text-[#00F0FF]" />
+                <div>
+                  <span className="text-gray-400 text-xs block">Department</span>
+                  <span className="text-white font-medium">{appointment.department}</span>
+                </div>
+              </div>
+
+              <div className="p-4 rounded-2xl bg-white/[0.03] border border-white/5 flex items-center gap-3">
+                <Calendar className="w-4 h-4 text-[#00F0FF]" />
+                <div>
+                  <span className="text-gray-400 text-xs block">Tenure Term</span>
+                  <span className="text-white font-medium">{appointment.tenure}</span>
+                </div>
+              </div>
+            </div>
+
+            {/* Cryptographic Hash Section */}
+            {appointment.verificationHash && (
+              <div className="p-4 rounded-2xl bg-black/40 border border-white/5">
+                <div className="flex items-center justify-between mb-1.5">
+                  <span className="text-[11px] font-mono uppercase text-gray-400 flex items-center gap-1.5">
+                    <Sparkles className="w-3.5 h-3.5 text-[#00F0FF]" />
+                    Verification Hash
+                  </span>
+                  <button
+                    onClick={copyHashToClipboard}
+                    className="text-xs text-[#00F0FF] hover:underline flex items-center gap-1 font-mono"
+                  >
+                    {copiedHash ? (
+                      <>
+                        <Check className="w-3.5 h-3.5" /> Copied
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="w-3.5 h-3.5" /> Copy Hash
+                      </>
+                    )}
+                  </button>
+                </div>
+                <p className="text-xs font-mono text-gray-300 break-all bg-white/[0.02] p-2.5 rounded-xl border border-white/5">
+                  {appointment.verificationHash}
+                </p>
+              </div>
+            )}
+
+            {/* Action Buttons */}
+            <div className="flex flex-col sm:flex-row gap-3 pt-2">
+              <button
+                type="button"
+                onClick={() => setShowPreviewModal(true)}
+                className="flex-1 bg-white/5 hover:bg-white/10 active:scale-[0.99] border border-white/10 text-white rounded-2xl py-3.5 text-sm font-semibold transition-all flex items-center justify-center gap-2 cursor-pointer"
+              >
+                <Eye className="w-4 h-4 text-gray-300" />
+                <span>Preview Letter</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={handleDownload}
+                disabled={downloading}
+                className="flex-1 bg-[#00F0FF] hover:bg-[#00F0FF]/90 active:scale-[0.99] text-black rounded-2xl py-3.5 text-sm font-semibold transition-all flex items-center justify-center gap-2 shadow-[0_0_20px_rgba(0,240,255,0.25)] cursor-pointer disabled:opacity-50"
+              >
+                {downloading ? (
+                  <>
+                    <Loader2 className="w-4 h-4 animate-spin" />
+                    <span>Preparing PDF...</span>
+                  </>
+                ) : (
+                  <>
+                    <Download className="w-4 h-4" />
+                    <span>Download Official PDF</span>
+                  </>
+                )}
+              </button>
+            </div>
+          </div>
+        )}
+      </div>
 
       {/* PDF Modal */}
-      {showPdfModal && appointment && (
+      {showPreviewModal && appointment && (
         <PDFViewerModal
-          documentUrl={getDocUrl(appointment.id)}
-          candidateName={appointment.fullName}
-          onClose={() => setShowPdfModal(false)}
+          regNo={appointment.regNo}
+          name={appointment.name}
+          onClose={() => setShowPreviewModal(false)}
         />
       )}
-
-      {/* Footer */}
-      <footer className="border-t border-slate-800/80 bg-[#050B14] py-6 text-center text-xs font-mono text-slate-500">
-        Stats-O-Locked Club &bull; VIT Bhopal University &copy; 2026. All rights reserved. &bull;{' '}
-        <button onClick={onOpenAdmin} className="text-[#00F0FF] hover:underline">
-          Admin Portal
-        </button>
-      </footer>
     </div>
   );
-};
+}
