@@ -61,7 +61,7 @@ export function parseAndValidateCSV(fileBuffer) {
     const rowNum = index + 2;
     const getValue = (key) => {
       const colName = detectedMapping[key];
-      return colName && row[colName] !== undefined ? String(row[colName]).strip() : '';
+      return colName && row[colName] !== undefined ? String(row[colName]).trim() : '';
     };
 
     const fullName = getValue('fullName');
