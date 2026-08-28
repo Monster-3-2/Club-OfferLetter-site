@@ -138,7 +138,3 @@ function strClean(s) {
 function isValidEmail(email) {
   return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
 }
-
-String.prototype.strip = function() {
-  return this.trim();
-};
