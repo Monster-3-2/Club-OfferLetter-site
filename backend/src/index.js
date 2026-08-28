@@ -7,7 +7,10 @@ import { fileURLToPath } from 'url';
 import multer from 'multer';
 import bcrypt from 'bcryptjs';
 import jwt from 'jsonwebtoken';
+
 import { PrismaClient } from '@prisma/client';
+import { createClient } from '@libsql/client';
+import { PrismaLibSQL } from '@prisma/adapter-libsql';
 
 import { generateAppointmentPDF } from './pdfGenerator.js';
 import { parseAndValidateCSV } from './csvParser.js';
@@ -19,7 +22,17 @@ const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
 
 const app = express();
-const prisma = new PrismaClient();
+
+const libsql = createClient({
+  url: process.env.TURSO_DATABASE_URL,
+  authToken: process.env.TURSO_AUTH_TOKEN,
+});
+
+const adapter = new PrismaLibSQL(libsql);
+
+const prisma = new PrismaClient({
+  adapter,
+});
 
 const PORT = process.env.PORT || 5000;
 const JWT_SECRET = process.env.JWT_SECRET || 'stats_o_locked_jwt_super_secret_key_2026';
