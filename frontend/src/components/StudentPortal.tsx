@@ -13,7 +13,7 @@ import {
   Calendar,
   Award,
   Hash,
-  Building2,
+  Building2
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { PDFViewerModal } from './PDFViewerModal';
@@ -37,31 +37,19 @@ interface AppointmentRecord {
   hasDocument: boolean;
 }
 
-/*
- * BACKEND API
- * Frontend:
- * https://appointmentstatsolocked.vercel.app
- *
- * Backend:
- * https://backend-six-sand-58.vercel.app
- */
 const API_URL = 'https://backend-six-sand-58.vercel.app';
 
-export const StudentPortal: React.FC<StudentPortalProps> = ({
-  onOpenAdmin,
-}) => {
+export const StudentPortal: React.FC<StudentPortalProps> = ({ onOpenAdmin }) => {
   const [email, setEmail] = useState<string>('');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
-  const [appointment, setAppointment] =
-    useState<AppointmentRecord | null>(null);
+  const [appointment, setAppointment] = useState<AppointmentRecord | null>(null);
   const [showPdfModal, setShowPdfModal] = useState<boolean>(false);
 
   const handleVerify = async (e: React.FormEvent) => {
     e.preventDefault();
 
     const cleanEmail = email.trim().toLowerCase();
-
     if (!cleanEmail) return;
 
     setLoading(true);
@@ -72,11 +60,11 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
       const res = await fetch(`${API_URL}/api/appointments/verify`, {
         method: 'POST',
         headers: {
-          'Content-Type': 'application/json',
+          'Content-Type': 'application/json'
         },
         body: JSON.stringify({
-          email: cleanEmail,
-        }),
+          email: cleanEmail
+        })
       });
 
       const data = await res.json();
@@ -93,31 +81,25 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({
       setAppointment(data.appointment);
       setLoading(false);
 
-      // Trigger Confetti Celebration
       confetti({
         particleCount: 80,
         spread: 70,
         origin: { y: 0.6 },
-        colors: ['#00F0FF', '#0070F3', '#7928CA', '#10B981'],
+        colors: ['#00F0FF', '#0070F3', '#7928CA', '#10B981']
       });
     } catch (err: any) {
-      console.error('Appointment verification error:', err);
-
+      console.error(err);
       setError('Server connection error. Please try again.');
       setLoading(false);
     }
   };
 
-  /*
-   * Appointment document endpoint
-   * Uses the backend directly instead of the frontend domain.
-   */
   const getDocUrl = (id: string) =>
     `${API_URL}/api/appointments/${id}/document`;
 
   return (
     <div className="min-h-screen bg-[#050B14] bg-grid-pattern text-white flex flex-col font-sans relative overflow-hidden">
-      
+
       {/* Header Bar */}
       <header className="border-b border-slate-800 bg-[#050B14]/90 backdrop-blur-md sticky top-0 z-30">
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-4 flex items-center justify-between">
