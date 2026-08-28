@@ -15,7 +15,10 @@ import {
 } from 'lucide-react';
 
 import { AppointmentsTable, AppointmentItem } from './AppointmentsTable';
-import { AddEditAppointmentModal, DeleteConfirmModal } from './AppointmentModals';
+import {
+  AddEditAppointmentModal,
+  DeleteConfirmModal,
+} from './AppointmentModals';
 import { CSVImporter } from './CSVImporter';
 import { PDFViewerModal } from './PDFViewerModal';
 
@@ -31,26 +34,21 @@ interface StatsData {
 }
 
 /*
- * IMPORTANT:
- * Frontend and backend are deployed separately.
+ * BACKEND API
  *
  * Frontend:
  * https://appointmentstatsolocked.vercel.app
  *
  * Backend:
  * https://backend-six-sand-58.vercel.app
- *
- * Therefore ALL API requests must go to the backend.
  */
-const API_URL =
-  import.meta.env.VITE_API_URL ||
-  'https://backend-six-sand-58.vercel.app';
+const API_URL = 'https://backend-six-sand-58.vercel.app';
 
 export const AdminPortal: React.FC<AdminPortalProps> = ({
   onBackToStudent,
 }) => {
   // --------------------------------------------------------------------------
-  // AUTH STATE
+  // AUTH
   // --------------------------------------------------------------------------
 
   const [token, setToken] = useState<string | null>(() =>
@@ -64,7 +62,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   } | null>(null);
 
   // --------------------------------------------------------------------------
-  // LOGIN STATE
+  // LOGIN
   // --------------------------------------------------------------------------
 
   const [loginEmail, setLoginEmail] = useState<string>(
@@ -88,7 +86,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [mobileMenuOpen, setMobileMenuOpen] = useState<boolean>(false);
 
   // --------------------------------------------------------------------------
-  // DASHBOARD DATA
+  // STATS
   // --------------------------------------------------------------------------
 
   const [stats, setStats] = useState<StatsData>({
@@ -144,7 +142,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const [viewPdfUrl, setViewPdfUrl] = useState<string | null>(null);
 
   // --------------------------------------------------------------------------
-  // CHECK AUTH SESSION
+  // INITIAL AUTH / DATA LOAD
   // --------------------------------------------------------------------------
 
   useEffect(() => {
@@ -156,7 +154,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   }, [token]);
 
   // --------------------------------------------------------------------------
-  // FETCH APPOINTMENTS WHEN FILTERS CHANGE
+  // REFRESH APPOINTMENTS WHEN FILTERS CHANGE
   // --------------------------------------------------------------------------
 
   useEffect(() => {
@@ -174,7 +172,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   ]);
 
   // --------------------------------------------------------------------------
-  // GET CURRENT ADMIN
+  // FETCH ADMIN SESSION
   // --------------------------------------------------------------------------
 
   const fetchAdminMe = async () => {
@@ -189,7 +187,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
       if (!res.ok) {
         console.error(
-          'Admin /me request failed:',
+          'Admin session request failed:',
           res.status,
           res.statusText
         );
@@ -315,22 +313,24 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
     try {
       console.log(
-        'Attempting admin login through:',
+        'Admin login request:',
         `${API_URL}/api/admin/login`
       );
 
-      const res = await fetch(`${API_URL}/api/admin/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          email: loginEmail.trim().toLowerCase(),
-          password: loginPassword,
-        }),
-      });
+      const res = await fetch(
+        `${API_URL}/api/admin/login`,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            email: loginEmail.trim().toLowerCase(),
+            password: loginPassword,
+          }),
+        }
+      );
 
-      // Handle HTTP errors before trying to parse JSON
       if (!res.ok) {
         let errorMessage = `Server returned ${res.status}`;
 
@@ -341,7 +341,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             errorMessage = errorData.error;
           }
         } catch {
-          // Response wasn't JSON
+          // Response was not JSON.
         }
 
         throw new Error(errorMessage);
@@ -358,7 +358,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         return;
       }
 
-      // Save authentication token
+      if (!data.token) {
+        throw new Error(
+          'Login succeeded but no authentication token was returned.'
+        );
+      }
+
       localStorage.setItem(
         'admin_token',
         data.token
@@ -366,11 +371,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
       setToken(data.token);
 
-      setAdminUser(data.admin);
+      setAdminUser(data.admin || null);
 
       setLoginLoading(false);
     } catch (err: any) {
-      console.error('Admin login error:', err);
+      console.error(
+        'Admin login error:',
+        err
+      );
 
       setLoginError(
         err?.message ||
@@ -406,6 +414,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   const handleSaveAppointment = async (
     formData: FormData
   ) => {
+    if (!token) {
+      throw new Error('Admin session expired.');
+    }
+
     const isEdit =
       showEditModal && selectedAppt;
 
@@ -425,9 +437,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       });
 
       if (!res.ok) {
-        throw new Error(
-          `Server returned ${res.status}`
-        );
+        let message = `Server returned ${res.status}`;
+
+        try {
+          const errorData = await res.json();
+
+          if (errorData?.error) {
+            message = errorData.error;
+          }
+        } catch {
+          // Ignore non-JSON response.
+        }
+
+        throw new Error(message);
       }
 
       const data = await res.json();
@@ -444,7 +466,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       await fetchAppointments();
 
       setShowAddModal(false);
+
       setShowEditModal(false);
+
       setSelectedAppt(null);
     } catch (err: any) {
       console.error(
@@ -475,9 +499,19 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
       );
 
       if (!res.ok) {
-        throw new Error(
-          `Server returned ${res.status}`
-        );
+        let message = `Server returned ${res.status}`;
+
+        try {
+          const errorData = await res.json();
+
+          if (errorData?.error) {
+            message = errorData.error;
+          }
+        } catch {
+          // Ignore non-JSON response.
+        }
+
+        throw new Error(message);
       }
 
       const data = await res.json();
@@ -487,13 +521,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           data.error ||
             'Failed to delete record.'
         );
-      } else {
-        setShowDeleteModal(false);
-        setSelectedAppt(null);
 
-        await fetchStats();
-        await fetchAppointments();
+        return;
       }
+
+      setShowDeleteModal(false);
+
+      setSelectedAppt(null);
+
+      await fetchStats();
+
+      await fetchAppointments();
     } catch (err: any) {
       console.error(
         'Delete appointment error:',
@@ -515,7 +553,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
     return (
       <div className="min-h-screen bg-[#050B14] bg-grid-pattern text-white flex flex-col items-center justify-center p-4 relative font-sans select-none">
 
-        {/* Back to Student Portal */}
+        {/* BACK TO STUDENT PORTAL */}
         <div className="absolute top-6 left-6">
           <button
             onClick={onBackToStudent}
@@ -525,13 +563,20 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           </button>
         </div>
 
+        {/* LOGIN CARD */}
         <motion.div
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
+          initial={{
+            opacity: 0,
+            y: 20,
+          }}
+          animate={{
+            opacity: 1,
+            y: 0,
+          }}
           className="w-full max-w-md bg-[#091424]/90 border border-slate-800 p-8 rounded-3xl shadow-2xl hud-box space-y-6"
         >
 
-          {/* Login Header */}
+          {/* HEADER */}
           <div className="text-center space-y-3">
 
             <div className="w-14 h-14 bg-[#00F0FF]/10 text-[#00F0FF] rounded-full flex items-center justify-center mx-auto border border-[#00F0FF]/30">
@@ -548,21 +593,22 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
           </div>
 
-          {/* Error */}
+          {/* LOGIN ERROR */}
           {loginError && (
             <div className="p-3 bg-rose-500/10 border border-rose-500/30 rounded-xl text-rose-300 text-xs font-mono">
               ⚠ {loginError}
             </div>
           )}
 
-          {/* Login Form */}
+          {/* LOGIN FORM */}
           <form
             onSubmit={handleLogin}
             className="space-y-4"
           >
 
-            {/* Email */}
+            {/* EMAIL */}
             <div>
+
               <label className="block text-xs font-mono font-bold text-slate-300 uppercase mb-1">
                 ADMIN EMAIL
               </label>
@@ -575,7 +621,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   type="email"
                   value={loginEmail}
                   onChange={(e) =>
-                    setLoginEmail(e.target.value)
+                    setLoginEmail(
+                      e.target.value
+                    )
                   }
                   placeholder="admin@statsolocked.in"
                   required
@@ -583,10 +631,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 />
 
               </div>
+
             </div>
 
-            {/* Password */}
+            {/* PASSWORD */}
             <div>
+
               <label className="block text-xs font-mono font-bold text-slate-300 uppercase mb-1">
                 PASSWORD
               </label>
@@ -599,7 +649,9 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                   type="password"
                   value={loginPassword}
                   onChange={(e) =>
-                    setLoginPassword(e.target.value)
+                    setLoginPassword(
+                      e.target.value
+                    )
                   }
                   placeholder="••••••••"
                   required
@@ -607,9 +659,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
                 />
 
               </div>
+
             </div>
 
-            {/* Login Button */}
+            {/* LOGIN BUTTON */}
             <button
               type="submit"
               disabled={loginLoading}
@@ -622,17 +675,25 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
           </form>
 
+          {/* DEMO CREDENTIALS */}
           <div className="text-center pt-2">
+
             <span className="text-[11px] font-mono text-slate-500">
+
               Demo Credentials:{' '}
+
               <code className="text-[#00F0FF]">
                 admin@statsolocked.in
-              </code>{' '}
-              /{' '}
+              </code>
+
+              {' / '}
+
               <code className="text-[#00F0FF]">
                 admin123
               </code>
+
             </span>
+
           </div>
 
         </motion.div>
@@ -641,17 +702,18 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
   }
 
   // --------------------------------------------------------------------------
-  // ADMIN DASHBOARD
+  // AUTHENTICATED ADMIN DASHBOARD
   // --------------------------------------------------------------------------
 
   return (
     <div className="min-h-screen bg-[#050B14] text-white flex flex-col font-sans">
 
-      {/* TOP HEADER */}
+      {/* HEADER */}
       <header className="border-b border-slate-800 bg-[#091424] sticky top-0 z-30">
 
         <div className="max-w-7xl mx-auto px-4 sm:px-6 py-3.5 flex items-center justify-between">
 
+          {/* BRAND */}
           <div className="flex items-center gap-3">
 
             <button
@@ -666,14 +728,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             </button>
 
             <div className="w-9 h-9 rounded-full border border-[#00F0FF] p-0.5 bg-white">
+
               <img
                 src="/stats_club_logo.png"
                 alt="Stats Emblem"
                 className="w-full h-full object-contain rounded-full"
               />
+
             </div>
 
             <div>
+
               <h1 className="font-heading font-black text-lg text-white tracking-wider leading-none">
                 STATS-O-LOCKED ADMIN
               </h1>
@@ -681,13 +746,16 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               <span className="text-[10px] font-mono text-[#00F0FF]">
                 APPOINTMENT CONTROL CENTER
               </span>
+
             </div>
 
           </div>
 
+          {/* HEADER ACTIONS */}
           <div className="flex items-center gap-4">
 
             <div className="hidden sm:block text-right">
+
               <p className="text-xs font-bold text-white leading-none">
                 {adminUser?.name ||
                   'Administrator'}
@@ -696,6 +764,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               <p className="text-[10px] font-mono text-slate-400">
                 {adminUser?.email}
               </p>
+
             </div>
 
             {/* STUDENT VIEW */}
@@ -718,9 +787,10 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           </div>
 
         </div>
+
       </header>
 
-      {/* MAIN WORKSPACE */}
+      {/* WORKSPACE */}
       <div className="flex-1 max-w-7xl w-full mx-auto px-4 sm:px-6 py-6 flex gap-6">
 
         {/* SIDEBAR */}
@@ -732,6 +802,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           }`}
         >
 
+          {/* MOBILE MENU HEADER */}
           <div className="flex items-center justify-between md:hidden pb-4 border-b border-slate-800">
 
             <span className="font-heading font-bold text-sm text-white">
@@ -749,6 +820,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
 
           </div>
 
+          {/* NAVIGATION */}
           <div className="space-y-1">
 
             <span className="text-[10px] font-mono font-bold text-slate-500 uppercase tracking-widest px-3">
@@ -853,15 +925,17 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
             </div>
 
           </div>
+
         </aside>
 
-        {/* MAIN CONTENT */}
+        {/* MAIN */}
         <main className="flex-1 space-y-6 min-w-0">
 
           {/* DASHBOARD HEADER */}
           <div className="flex items-center justify-between flex-wrap gap-4 bg-[#091424] border border-slate-800 p-6 rounded-3xl hud-box">
 
             <div>
+
               <h2 className="font-heading font-black text-2xl text-white tracking-wide">
                 ADMIN CONTROL CENTER
               </h2>
@@ -869,6 +943,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               <p className="text-xs font-mono text-slate-400">
                 Stats-O-Locked Official Appointment Management System
               </p>
+
             </div>
 
             <div className="flex items-center gap-3">
@@ -884,12 +959,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               </button>
 
             </div>
+
           </div>
 
-          {/* STATISTICS */}
+          {/* STATS */}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
 
             <div className="bg-[#091424] border border-slate-800 p-5 rounded-2xl">
+
               <span className="text-xs font-mono font-bold text-slate-400 uppercase">
                 TOTAL APPOINTMENTS
               </span>
@@ -897,9 +974,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               <p className="font-heading font-black text-3xl text-white mt-1">
                 {stats.total}
               </p>
+
             </div>
 
             <div className="bg-[#091424] border border-emerald-500/30 p-5 rounded-2xl">
+
               <span className="text-xs font-mono font-bold text-emerald-400 uppercase">
                 VERIFIED
               </span>
@@ -907,9 +986,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               <p className="font-heading font-black text-3xl text-emerald-400 mt-1">
                 {stats.verified}
               </p>
+
             </div>
 
             <div className="bg-[#091424] border border-amber-500/30 p-5 rounded-2xl">
+
               <span className="text-xs font-mono font-bold text-amber-400 uppercase">
                 PENDING
               </span>
@@ -917,9 +998,11 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               <p className="font-heading font-black text-3xl text-amber-400 mt-1">
                 {stats.pending}
               </p>
+
             </div>
 
             <div className="bg-[#091424] border border-[#00F0FF]/30 p-5 rounded-2xl">
+
               <span className="text-xs font-mono font-bold text-[#00F0FF] uppercase">
                 DOCUMENTS AVAILABLE
               </span>
@@ -927,11 +1010,12 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
               <p className="font-heading font-black text-3xl text-[#00F0FF] mt-1">
                 {stats.documentsAvailable}
               </p>
+
             </div>
 
           </div>
 
-          {/* APPOINTMENTS / CSV */}
+          {/* CONTENT */}
           {activeTab === 'BULK_IMPORT' ? (
 
             <CSVImporter
@@ -988,12 +1072,14 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           )}
 
         </main>
+
       </div>
 
       {/* ADD / EDIT MODAL */}
       <AddEditAppointmentModal
         isOpen={
-          showAddModal || showEditModal
+          showAddModal ||
+          showEditModal
         }
 
         isEditing={showEditModal}
@@ -1009,7 +1095,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
         onSave={handleSaveAppointment}
       />
 
-      {/* DELETE MODAL */}
+      {/* DELETE CONFIRMATION */}
       <DeleteConfirmModal
         isOpen={showDeleteModal}
 
