@@ -141,12 +141,7 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ onOpenAdmin }) => 
               />
             </div>
 
-            <button
-              onClick={onOpenAdmin}
-              className="hidden md:flex items-center gap-2 px-3.5 py-2 text-xs font-mono font-bold text-slate-300 hover:text-[#00F0FF] bg-slate-900/80 border border-slate-800 hover:border-[#00F0FF]/40 rounded-xl transition"
-            >
-              ADMIN PORTAL
-            </button>
+
           </div>
         </div>
       </header>
