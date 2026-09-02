@@ -372,7 +372,12 @@ export const StudentPortal: React.FC<StudentPortalProps> = ({ onOpenAdmin }) => 
       <footer className="border-t border-slate-800/80 bg-[#050B14] py-6 text-center text-xs font-mono text-slate-500">
         Stats-O-Locked Club &bull; VIT Bhopal University &copy; 2026. All rights reserved. &bull;{' '}
 
-
+        <button
+          onClick={onOpenAdmin}
+          className="text-[#00F0FF] hover:underline"
+        >
+          Admin Portal
+        </button>
       </footer>
     </div>
   );
