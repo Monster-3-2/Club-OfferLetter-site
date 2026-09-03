@@ -13,7 +13,7 @@ import { createClient } from '@libsql/client';
 import { PrismaLibSQL } from '@prisma/adapter-libsql';
 
 import { generateAppointmentPDF } from './pdfGenerator.js';
-import { parseAndValidateCSV } from './csvParser.js';
+import { parseAndValidateXLSX } from './xlsxParser.js';
 import { authenticateAdmin } from './authMiddleware.js';
 
 dotenv.config();
@@ -60,10 +60,29 @@ const upload = multer({
   storage,
   limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB max
   fileFilter: (req, file, cb) => {
-    if (file.mimetype === 'application/pdf' || file.originalname.endsWith('.pdf') || file.mimetype === 'text/csv' || file.originalname.endsWith('.csv')) {
+    if (file.mimetype === 'application/pdf' || file.originalname.endsWith('.pdf')) {
       cb(null, true);
     } else {
-      cb(new Error('Invalid file format. Only PDF and CSV files are allowed.'));
+      cb(new Error('Invalid file format. Only PDF files are allowed.'));
+    }
+  }
+});
+
+const uploadXLSX = multer({
+  storage,
+  limits: { fileSize: 20 * 1024 * 1024 }, // 20 MB max
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const mime = file.mimetype;
+    const isXlsxExt = ext === '.xlsx';
+    const isXlsxMime = mime === 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet' ||
+                       mime === 'application/octet-stream' ||
+                       mime === 'application/vnd.ms-excel' ||
+                       mime === 'application/x-xlsx';
+    if (isXlsxExt || (isXlsxExt && isXlsxMime)) {
+      cb(null, true);
+    } else {
+      cb(new Error('Please upload an XLSX file. Only .xlsx files are allowed.'));
     }
   }
 });
@@ -489,21 +508,23 @@ app.post('/api/admin/appointments/:id/document', authenticateAdmin, upload.singl
 });
 
 // ==========================================================================
-// 4. CSV BULK IMPORT SUITE APIS
+// 4. XLSX BULK IMPORT SUITE APIS
 // ==========================================================================
 
-// Parse CSV & Auto-Map Columns
-app.post('/api/admin/import/csv-parse', authenticateAdmin, upload.single('csvFile'), async (req, res) => {
+// Parse XLSX & Auto-Map Columns
+app.post('/api/admin/import/xlsx-parse', authenticateAdmin, uploadXLSX.single('xlsxFile'), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ ok: false, error: 'Please upload a CSV file.' });
+      return res.status(400).json({ ok: false, error: 'Please upload an XLSX file.' });
     }
 
     const fileBuffer = fs.readFileSync(req.file.path);
-    const parsedData = parseAndValidateCSV(fileBuffer);
+    const parsedData = parseAndValidateXLSX(fileBuffer);
 
     // Clean temp file
-    fs.unlinkSync(req.file.path);
+    if (fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
 
     return res.json({
       ok: true,
@@ -513,12 +534,15 @@ app.post('/api/admin/import/csv-parse', authenticateAdmin, upload.single('csvFil
       rows: parsedData.rows
     });
   } catch (err) {
-    console.error('CSV Parse Error:', err);
-    return res.status(400).json({ ok: false, error: err.message || 'Failed to parse CSV file.' });
+    if (req.file && fs.existsSync(req.file.path)) {
+      fs.unlinkSync(req.file.path);
+    }
+    console.error('XLSX Parse Error:', err);
+    return res.status(400).json({ ok: false, error: err.message || 'Failed to parse XLSX file.' });
   }
 });
 
-// Confirm & Execute Bulk CSV Import
+// Confirm & Execute Bulk XLSX Import
 app.post('/api/admin/import/confirm', authenticateAdmin, async (req, res) => {
   try {
     const { rows, duplicateStrategy = 'update' } = req.body;
@@ -603,7 +627,7 @@ app.post('/api/admin/import/confirm', authenticateAdmin, async (req, res) => {
       }
     }
 
-    await recordAuditLog(req.admin.adminId, req.admin.email, 'BULK_CSV_IMPORT', 'Appointment', null, {
+    await recordAuditLog(req.admin.adminId, req.admin.email, 'BULK_XLSX_IMPORT', 'Appointment', null, {
       insertedCount,
       updatedCount,
       skippedCount,

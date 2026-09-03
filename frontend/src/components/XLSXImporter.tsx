@@ -1,8 +1,9 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Upload, FileSpreadsheet, Download, CheckCircle2, AlertTriangle, XCircle, ArrowRight, RefreshCw, Layers } from 'lucide-react';
+import * as XLSX from 'xlsx';
 
-interface CSVRow {
+interface XLSXRow {
   rowNum: number;
   appointmentId: string;
   fullName: string;
@@ -14,25 +15,25 @@ interface CSVRow {
   issues: string[];
 }
 
-interface CSVImportSummary {
+interface XLSXImportSummary {
   total: number;
   valid: number;
   attention: number;
   invalid: number;
 }
 
-interface CSVImporterProps {
+interface XLSXImporterProps {
   onComplete: () => void;
 }
 
-export const CSVImporter: React.FC<CSVImporterProps> = ({ onComplete }) => {
+export const XLSXImporter: React.FC<XLSXImporterProps> = ({ onComplete }) => {
   const [stage, setStage] = useState<'UPLOAD' | 'PREVIEW' | 'COMPLETE'>('UPLOAD');
   const [loading, setLoading] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
 
   const [detectedMapping, setDetectedMapping] = useState<Record<string, string>>({});
-  const [summary, setSummary] = useState<CSVImportSummary | null>(null);
-  const [rows, setRows] = useState<CSVRow[]>([]);
+  const [summary, setSummary] = useState<XLSXImportSummary | null>(null);
+  const [rows, setRows] = useState<XLSXRow[]>([]);
   const [duplicateStrategy, setDuplicateStrategy] = useState<'update' | 'skip' | 'create'>('update');
 
   const [importResult, setImportResult] = useState<{
@@ -42,29 +43,55 @@ export const CSVImporter: React.FC<CSVImporterProps> = ({ onComplete }) => {
     errors: { rowNum: number; name: string; email: string; reason: string }[];
   } | null>(null);
 
-  // Download Sample CSV Template
+  // Download Sample XLSX Template
   const handleDownloadTemplate = () => {
-    const csvContent = `appointment_id,full_name,email,position,department,appointment_date,status\nSOL-2026-001,Sankil Sudrik,sankil@statsolocked.in,Data Science Core Member,Technical,20/08/2026,Verified\nSOL-2026-002,Student Two,student2@example.com,Event Coordinator,Events,20/08/2026,Verified\nSOL-2026-003,Student Three,student3@example.com,Creative Co-Lead,Creative,20/08/2026,Verified`;
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'stats_o_locked_appointment_template.csv';
-    a.click();
-    URL.revokeObjectURL(url);
+    const data = [
+      {
+        appointment_id: 'SOL-2026-001',
+        full_name: 'Sankil Sudrik',
+        email: 'sankil@statsolocked.in',
+        position: 'Data Science Core Member',
+        department: 'Technical',
+        appointment_date: '20/08/2026',
+        status: 'Verified'
+      },
+      {
+        appointment_id: 'SOL-2026-002',
+        full_name: 'Student Two',
+        email: 'student2@example.com',
+        position: 'Event Coordinator',
+        department: 'Events',
+        appointment_date: '20/08/2026',
+        status: 'Verified'
+      },
+      {
+        appointment_id: 'SOL-2026-003',
+        full_name: 'Student Three',
+        email: 'student3@example.com',
+        position: 'Creative Co-Lead',
+        department: 'Creative',
+        appointment_date: '20/08/2026',
+        status: 'Verified'
+      }
+    ];
+
+    const worksheet = XLSX.utils.json_to_sheet(data);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Template');
+    XLSX.writeFile(workbook, 'stats_o_locked_appointment_template.xlsx');
   };
 
-  // Upload & Parse CSV
+  // Upload & Parse XLSX
   const handleFileUpload = async (file: File) => {
     setLoading(true);
     setError(null);
 
     const formData = new FormData();
-    formData.append('csvFile', file);
+    formData.append('xlsxFile', file);
 
     try {
       const token = localStorage.getItem('admin_token');
-      const res = await fetch('/api/admin/import/csv-parse', {
+      const res = await fetch('/api/admin/import/xlsx-parse', {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
@@ -72,7 +99,7 @@ export const CSVImporter: React.FC<CSVImporterProps> = ({ onComplete }) => {
 
       const data = await res.json();
       if (!data.ok) {
-        setError(data.error || 'Failed to parse CSV file.');
+        setError(data.error || 'Failed to parse XLSX file.');
         setLoading(false);
         return;
       }
@@ -83,7 +110,7 @@ export const CSVImporter: React.FC<CSVImporterProps> = ({ onComplete }) => {
       setStage('PREVIEW');
       setLoading(false);
     } catch (err: any) {
-      setError(err.message || 'Server error uploading CSV.');
+      setError(err.message || 'Server error uploading XLSX.');
       setLoading(false);
     }
   };
@@ -123,19 +150,21 @@ export const CSVImporter: React.FC<CSVImporterProps> = ({ onComplete }) => {
     }
   };
 
-  // Download Error Report CSV
+  // Download Error Report XLSX
   const handleDownloadErrorReport = () => {
     if (!importResult || !importResult.errors.length) return;
-    let csv = 'Row Number,Name,Email,Reason\n';
-    importResult.errors.forEach(e => {
-      csv += `"${e.rowNum}","${e.name}","${e.email}","${e.reason}"\n`;
-    });
-    const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = 'import_error_report.csv';
-    a.click();
+
+    const errorRows = importResult.errors.map(e => ({
+      'Row Number': e.rowNum,
+      'Name': e.name,
+      'Email': e.email,
+      'Reason': e.reason
+    }));
+
+    const worksheet = XLSX.utils.json_to_sheet(errorRows);
+    const workbook = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(workbook, worksheet, 'Error Report');
+    XLSX.writeFile(workbook, 'import_error_report.xlsx');
   };
 
   return (
@@ -145,10 +174,10 @@ export const CSVImporter: React.FC<CSVImporterProps> = ({ onComplete }) => {
       <div className="flex items-center justify-between flex-wrap gap-4 pb-6 border-b border-slate-800">
         <div>
           <h2 className="font-heading font-black text-xl sm:text-2xl text-white tracking-wide">
-            BULK CSV IMPORT ENGINE
+            BULK XLSX IMPORT ENGINE
           </h2>
           <p className="text-xs font-mono text-slate-400">
-            Upload a CSV file to create or update multiple appointment records at once.
+            Upload an XLSX file to create or update multiple appointment records at once.
           </p>
         </div>
 
@@ -156,7 +185,7 @@ export const CSVImporter: React.FC<CSVImporterProps> = ({ onComplete }) => {
           onClick={handleDownloadTemplate}
           className="px-4 py-2.5 bg-slate-900 hover:bg-slate-800 text-[#00F0FF] border border-[#00F0FF]/30 text-xs font-mono font-bold rounded-xl transition flex items-center gap-2"
         >
-          <Download className="w-4 h-4" /> DOWNLOAD CSV TEMPLATE
+          <Download className="w-4 h-4" /> DOWNLOAD XLSX TEMPLATE
         </button>
       </div>
 
@@ -172,7 +201,7 @@ export const CSVImporter: React.FC<CSVImporterProps> = ({ onComplete }) => {
           <div className="relative border-2 border-dashed border-slate-700 hover:border-[#00F0FF] bg-[#050B14] rounded-3xl p-10 text-center cursor-pointer transition hud-box">
             <input
               type="file"
-              accept=".csv"
+              accept=".xlsx,application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
               onChange={(e) => e.target.files?.length && handleFileUpload(e.target.files[0])}
               className="absolute inset-0 opacity-0 cursor-pointer z-10"
             />
@@ -182,7 +211,7 @@ export const CSVImporter: React.FC<CSVImporterProps> = ({ onComplete }) => {
                 <FileSpreadsheet className="w-10 h-10" />
               </div>
               <h3 className="font-heading font-extrabold text-lg text-white">
-                DROP CSV FILE HERE or CHOOSE CSV FILE
+                DROP XLSX FILE HERE or CHOOSE XLSX FILE
               </h3>
               <p className="text-xs text-slate-400 max-w-md">
                 Supports column headers like <code className="text-[#00F0FF]">Name</code>, <code className="text-[#00F0FF]">Email</code>, <code className="text-[#00F0FF]">Position</code>, <code className="text-[#00F0FF]">Department</code>, <code className="text-[#00F0FF]">Appointment ID</code>.
@@ -192,7 +221,7 @@ export const CSVImporter: React.FC<CSVImporterProps> = ({ onComplete }) => {
 
           {loading && (
             <div className="text-center py-6 font-mono text-xs text-[#00F0FF] animate-pulse">
-              Parsing and validating CSV data...
+              Parsing and validating XLSX data...
             </div>
           )}
         </div>
@@ -343,7 +372,7 @@ export const CSVImporter: React.FC<CSVImporterProps> = ({ onComplete }) => {
           <div>
             <h3 className="font-heading font-black text-2xl text-white">IMPORT COMPLETE</h3>
             <p className="text-xs font-mono text-slate-400 mt-1">
-              Database successfully updated with CSV records.
+              Database successfully updated with XLSX records.
             </p>
           </div>
 

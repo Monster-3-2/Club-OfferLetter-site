@@ -1,4 +1,4 @@
-import { parse } from 'csv-parse/sync';
+import XLSX from 'xlsx';
 
 const COLUMN_MAPPINGS = {
   fullName: ['full_name', 'name', 'full name', 'student name', 'candidate name'],
@@ -37,16 +37,25 @@ export function autoMapHeaders(rawHeaders) {
   return mapping;
 }
 
-export function parseAndValidateCSV(fileBuffer) {
-  const content = fileBuffer.toString('utf-8');
-  const records = parse(content, {
-    columns: true,
-    skip_empty_lines: true,
-    trim: true
-  });
+export function parseAndValidateXLSX(fileBuffer) {
+  let workbook;
+  try {
+    workbook = XLSX.read(fileBuffer, { type: 'buffer', cellDates: true });
+  } catch (err) {
+    throw new Error('Failed to parse XLSX file. Please ensure it is a valid .xlsx file.');
+  }
 
-  if (!records.length) {
-    throw new Error('CSV file is empty or missing data rows.');
+  if (!workbook || !workbook.SheetNames || !workbook.SheetNames.length) {
+    throw new Error('XLSX file is empty or missing data rows.');
+  }
+
+  const firstSheetName = workbook.SheetNames[0];
+  const worksheet = workbook.Sheets[firstSheetName];
+
+  const records = XLSX.utils.sheet_to_json(worksheet, { defval: '' });
+
+  if (!records || !records.length) {
+    throw new Error('XLSX file is empty or missing data rows.');
   }
 
   const rawHeaders = Object.keys(records[0]);
@@ -61,7 +70,17 @@ export function parseAndValidateCSV(fileBuffer) {
     const rowNum = index + 2;
     const getValue = (key) => {
       const colName = detectedMapping[key];
-      return colName && row[colName] !== undefined ? String(row[colName]).trim() : '';
+      if (colName && row[colName] !== undefined && row[colName] !== null) {
+        const val = row[colName];
+        if (val instanceof Date) {
+          const day = String(val.getDate()).padStart(2, '0');
+          const month = String(val.getMonth() + 1).padStart(2, '0');
+          const year = val.getFullYear();
+          return `${day}/${month}/${year}`;
+        }
+        return String(val).trim();
+      }
+      return '';
     };
 
     const fullName = getValue('fullName');

@@ -19,7 +19,7 @@ import {
   AddEditAppointmentModal,
   DeleteConfirmModal,
 } from './AppointmentModals';
-import { CSVImporter } from './CSVImporter';
+import { XLSXImporter } from './XLSXImporter';
 import { PDFViewerModal } from './PDFViewerModal';
 
 interface AdminPortalProps {
@@ -1018,7 +1018,7 @@ export const AdminPortal: React.FC<AdminPortalProps> = ({
           {/* CONTENT */}
           {activeTab === 'BULK_IMPORT' ? (
 
-            <CSVImporter
+            <XLSXImporter
               onComplete={() => {
                 fetchStats();
                 fetchAppointments();
