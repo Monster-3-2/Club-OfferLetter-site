@@ -23,10 +23,21 @@ const __dirname = path.dirname(__filename);
 
 const app = express();
 
-const libsql = createClient({
-  url: process.env.TURSO_DATABASE_URL,
-  authToken: process.env.TURSO_AUTH_TOKEN,
-});
+const tursoUrl = process.env.TURSO_DATABASE_URL;
+const tursoToken = process.env.TURSO_AUTH_TOKEN;
+
+let libsql;
+if (tursoUrl && tursoToken) {
+  libsql = createClient({
+    url: tursoUrl,
+    authToken: tursoToken,
+  });
+} else {
+  const localDbPath = path.resolve(__dirname, '../prisma/dev.db');
+  libsql = createClient({
+    url: `file:${localDbPath}`,
+  });
+}
 
 const adapter = new PrismaLibSQL(libsql);
 
@@ -664,6 +675,14 @@ app.get('/api/admin/audit-logs', authenticateAdmin, async (req, res) => {
   }
 });
 
+// Express Error Handling Middleware for Multer / Upload Errors
+app.use((err, req, res, next) => {
+  if (err) {
+    return res.status(400).json({ ok: false, error: err.message || 'File upload error.' });
+  }
+  next();
+});
+
 // Catch-all route for SPA
 app.get('*', (req, res) => {
   if (fs.existsSync(path.join(frontendDist, 'index.html'))) {
@@ -674,7 +693,7 @@ app.get('*', (req, res) => {
 });
 
 // Keep listen block for local testing only
-if (process.env.NODE_ENV !== 'production') {
+if (process.env.NODE_ENV !== 'production' && process.argv[1] && fileURLToPath(import.meta.url) === path.resolve(process.argv[1])) {
   const PORT = process.env.PORT || 5000;
   app.listen(PORT, () => console.log(`Server running on port ${PORT}`));
 }

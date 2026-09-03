@@ -17,6 +17,7 @@ import {
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { PDFViewerModal } from './PDFViewerModal';
+import { API_BASE_URL } from '../config';
 
 interface StudentPortalProps {
   onOpenAdmin: () => void;
@@ -37,7 +38,7 @@ interface AppointmentRecord {
   hasDocument: boolean;
 }
 
-const API_URL = 'https://backend-six-sand-58.vercel.app';
+const API_URL = API_BASE_URL;
 
 export const StudentPortal: React.FC<StudentPortalProps> = ({ onOpenAdmin }) => {
   const [email, setEmail] = useState<string>('');

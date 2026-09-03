@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Upload, FileSpreadsheet, Download, CheckCircle2, AlertTriangle, XCircle, ArrowRight, RefreshCw, Layers } from 'lucide-react';
 import * as XLSX from 'xlsx';
+import { API_BASE_URL } from '../config';
 
 interface XLSXRow {
   rowNum: number;
@@ -91,7 +92,7 @@ export const XLSXImporter: React.FC<XLSXImporterProps> = ({ onComplete }) => {
 
     try {
       const token = localStorage.getItem('admin_token');
-      const res = await fetch('/api/admin/import/xlsx-parse', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/import/xlsx-parse`, {
         method: 'POST',
         headers: token ? { Authorization: `Bearer ${token}` } : {},
         body: formData,
@@ -122,7 +123,7 @@ export const XLSXImporter: React.FC<XLSXImporterProps> = ({ onComplete }) => {
 
     try {
       const token = localStorage.getItem('admin_token');
-      const res = await fetch('/api/admin/import/confirm', {
+      const res = await fetch(`${API_BASE_URL}/api/admin/import/confirm`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',

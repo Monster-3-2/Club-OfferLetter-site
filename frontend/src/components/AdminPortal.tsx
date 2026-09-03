@@ -21,6 +21,7 @@ import {
 } from './AppointmentModals';
 import { XLSXImporter } from './XLSXImporter';
 import { PDFViewerModal } from './PDFViewerModal';
+import { API_BASE_URL } from '../config';
 
 interface AdminPortalProps {
   onBackToStudent: () => void;
@@ -42,7 +43,7 @@ interface StatsData {
  * Backend:
  * https://backend-six-sand-58.vercel.app
  */
-const API_URL = 'https://backend-six-sand-58.vercel.app';
+const API_URL = API_BASE_URL;
 
 export const AdminPortal: React.FC<AdminPortalProps> = ({
   onBackToStudent,

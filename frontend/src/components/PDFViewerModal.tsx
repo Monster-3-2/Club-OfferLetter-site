@@ -1,7 +1,8 @@
 import React from 'react';
 import { X, Download } from 'lucide-react';
+import { API_BASE_URL } from '../config';
 
-const API_BASE = ((import.meta as any).env?.VITE_API_URL || 'https://backend-six-sand-58.vercel.app').replace(/\/$/, '');
+const API_BASE = API_BASE_URL;
 
 export interface PDFViewerModalProps {
   documentUrl?: string;
